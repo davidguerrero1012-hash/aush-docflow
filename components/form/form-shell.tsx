@@ -23,20 +23,34 @@ import {
 import { US_STATES } from "@/lib/schemas";
 import type { IntakeFormData } from "@/types";
 
+// NEW FLOW: Scan first, then fill what OCR missed
+// Q0: Scan your ID (camera/upload + OCR)
+// Q1: Verify/edit name (auto-filled from OCR)
+// Q2: Verify/edit DOB (auto-filled from OCR)
+// Q3: SSN last 4 (can't get from OCR)
+// Q4: Phone + Email (can't get from OCR)
+// Q5: Verify/edit address (auto-filled from OCR)
+// Q6: Mailing address same?
+// Q7: Employment info
+// Q8: Annual income
+// Q9: Insurance (optional)
+// Q10: Additional notes (optional)
+// Q11: Review & submit
+
 const TOTAL_QUESTIONS = 12;
 
 const QUESTION_FIELDS: Record<number, string[]> = {
-  0: ["personalInfo.firstName", "personalInfo.lastName"],
-  1: ["personalInfo.dateOfBirth"],
-  2: ["personalInfo.ssnLast4"],
-  3: ["personalInfo.phone", "personalInfo.email"],
-  4: ["addressInfo.streetAddress", "addressInfo.city", "addressInfo.state", "addressInfo.zipCode"],
-  5: ["addressInfo.mailingSameAsResidential"],
-  6: ["employmentInfo.employerName", "employmentInfo.occupation", "employmentInfo.employmentStatus"],
-  7: ["employmentInfo.annualIncome"],
-  8: ["documentUpload.documentType", "documentUpload.documentPath"],
-  9: [], // optional — insurance
-  10: [], // optional — notes
+  0: ["documentUpload.documentType", "documentUpload.documentPath"],
+  1: ["personalInfo.firstName", "personalInfo.lastName"],
+  2: ["personalInfo.dateOfBirth"],
+  3: ["personalInfo.ssnLast4"],
+  4: ["personalInfo.phone", "personalInfo.email"],
+  5: ["addressInfo.streetAddress", "addressInfo.city", "addressInfo.state", "addressInfo.zipCode"],
+  6: ["addressInfo.mailingSameAsResidential"],
+  7: ["employmentInfo.employerName", "employmentInfo.occupation", "employmentInfo.employmentStatus"],
+  8: ["employmentInfo.annualIncome"],
+  9: [],  // optional
+  10: [], // optional
   11: [], // review
 };
 
@@ -96,8 +110,8 @@ const DEFAULT_VALUES: IntakeFormData = {
   },
 };
 
-// Individual question input components
-function Q0_Name() {
+// Q1: Name (auto-filled from OCR, user verifies)
+function Q1_Name() {
   const { register, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -117,7 +131,7 @@ function Q0_Name() {
   );
 }
 
-function Q1_DOB() {
+function Q2_DOB() {
   const { register, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -129,7 +143,7 @@ function Q1_DOB() {
   );
 }
 
-function Q2_SSN() {
+function Q3_SSN() {
   const { register, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -144,13 +158,13 @@ function Q2_SSN() {
         placeholder="0000"
         autoFocus
       />
-      <p className="text-xs text-zinc-400">This will be encrypted with AES-256-GCM before storage.</p>
+      <p className="text-xs text-zinc-400">Encrypted with AES-256-GCM before storage.</p>
       {e?.personalInfo?.ssnLast4 && <p className="text-sm text-red-500">{e.personalInfo.ssnLast4.message}</p>}
     </div>
   );
 }
 
-function Q3_Contact() {
+function Q4_Contact() {
   const { register, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -170,7 +184,7 @@ function Q3_Contact() {
   );
 }
 
-function Q4_Address() {
+function Q5_Address() {
   const { register, setValue, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -207,12 +221,11 @@ function Q4_Address() {
   );
 }
 
-function Q5_Mailing() {
+function Q6_Mailing() {
   const { setValue, watch, register, formState: { errors } } = useFormContext<IntakeFormData>();
   const isSame = watch("addressInfo.mailingSameAsResidential");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
-
   return (
     <div className="space-y-6">
       <div className="flex gap-3">
@@ -261,7 +274,7 @@ function Q5_Mailing() {
   );
 }
 
-function Q6_Employment() {
+function Q7_Employment() {
   const { register, setValue, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -295,7 +308,7 @@ function Q6_Employment() {
   );
 }
 
-function Q7_Income() {
+function Q8_Income() {
   const { register, formState: { errors } } = useFormContext<IntakeFormData>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const e = errors as any;
@@ -354,17 +367,17 @@ function Q10_Notes() {
   );
 }
 
-// Question definitions
+// Question definitions — scan first, then verify/fill
 const QUESTIONS = [
-  { text: "What's your name?", subtitle: undefined },
-  { text: "When were you born?", subtitle: undefined },
+  { text: "Scan your identification", subtitle: "We'll extract your information automatically" },
+  { text: "Verify your name", subtitle: "Confirm what we extracted from your document" },
+  { text: "Verify your date of birth", subtitle: "Confirm or correct" },
   { text: "Last 4 digits of your SSN", subtitle: "Required for identity verification" },
   { text: "How can we reach you?", subtitle: undefined },
-  { text: "What's your home address?", subtitle: undefined },
+  { text: "Verify your address", subtitle: "Confirm what we extracted from your document" },
   { text: "Is your mailing address the same?", subtitle: "As your home address above" },
   { text: "Tell us about your work", subtitle: undefined },
   { text: "What's your annual income?", subtitle: undefined },
-  { text: "Scan your identification", subtitle: "We'll extract information automatically" },
   { text: "Insurance details", subtitle: "You can skip this if not applicable" },
   { text: "Anything else we should know?", subtitle: "Optional notes or comments" },
   { text: "Review your information", subtitle: "Make sure everything looks correct" },
@@ -494,15 +507,15 @@ export function FormShell() {
 
   const questionContent = useMemo(() => {
     switch (currentQ) {
-      case 0: return <Q0_Name />;
-      case 1: return <Q1_DOB />;
-      case 2: return <Q2_SSN />;
-      case 3: return <Q3_Contact />;
-      case 4: return <Q4_Address />;
-      case 5: return <Q5_Mailing />;
-      case 6: return <Q6_Employment />;
-      case 7: return <Q7_Income />;
-      case 8: return <DocumentUpload />;
+      case 0: return <DocumentUpload />;
+      case 1: return <Q1_Name />;
+      case 2: return <Q2_DOB />;
+      case 3: return <Q3_SSN />;
+      case 4: return <Q4_Contact />;
+      case 5: return <Q5_Address />;
+      case 6: return <Q6_Mailing />;
+      case 7: return <Q7_Employment />;
+      case 8: return <Q8_Income />;
       case 9: return <Q9_Insurance />;
       case 10: return <Q10_Notes />;
       case 11: return <ReviewSubmit onEditStep={goTo} />;
@@ -512,7 +525,7 @@ export function FormShell() {
 
   const q = QUESTIONS[currentQ];
   const isReview = currentQ === 11;
-  const isDocUpload = currentQ === 8;
+  const isDocUpload = currentQ === 0;
 
   return (
     <FormProvider {...form}>

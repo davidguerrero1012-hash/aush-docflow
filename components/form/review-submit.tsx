@@ -82,8 +82,8 @@ export function ReviewSubmit({ onEditStep }: ReviewSubmitProps) {
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      {/* Personal Info — maps to questions 0-3 */}
-      <ReviewSection title="Personal Information" questionIndex={0} onEdit={onEditStep}>
+      {/* Personal Info — maps to questions 1-4 */}
+      <ReviewSection title="Personal Information" questionIndex={1} onEdit={onEditStep}>
         <ReviewRow
           label="Name"
           value={`${personal?.firstName || ""} ${personal?.lastName || ""}`}
@@ -96,8 +96,8 @@ export function ReviewSubmit({ onEditStep }: ReviewSubmitProps) {
 
       <div className="border-t border-zinc-200" />
 
-      {/* Address Info — maps to questions 4-5 */}
-      <ReviewSection title="Address" questionIndex={4} onEdit={onEditStep}>
+      {/* Address Info — maps to questions 5-6 */}
+      <ReviewSection title="Address" questionIndex={5} onEdit={onEditStep}>
         <ReviewRow label="Street" value={address?.streetAddress} />
         <ReviewRow
           label="City, State ZIP"
@@ -120,8 +120,8 @@ export function ReviewSubmit({ onEditStep }: ReviewSubmitProps) {
 
       <div className="border-t border-zinc-200" />
 
-      {/* Employment Info — maps to questions 6-7 */}
-      <ReviewSection title="Employment" questionIndex={6} onEdit={onEditStep}>
+      {/* Employment Info — maps to questions 7-8 */}
+      <ReviewSection title="Employment" questionIndex={7} onEdit={onEditStep}>
         <ReviewRow label="Employer" value={employment?.employerName} />
         <ReviewRow label="Occupation" value={employment?.occupation} />
         <ReviewRow
@@ -145,8 +145,8 @@ export function ReviewSubmit({ onEditStep }: ReviewSubmitProps) {
 
       <div className="border-t border-zinc-200" />
 
-      {/* Document — maps to question 8 */}
-      <ReviewSection title="Document" questionIndex={8} onEdit={onEditStep}>
+      {/* Document — maps to question 0 */}
+      <ReviewSection title="Document" questionIndex={0} onEdit={onEditStep}>
         <ReviewRow
           label="Document Type"
           value={
@@ -171,6 +171,7 @@ export function ReviewSubmit({ onEditStep }: ReviewSubmitProps) {
 
       {/* Additional Info — maps to questions 9-10 */}
       <ReviewSection title="Additional" questionIndex={9} onEdit={onEditStep}>
+
         <ReviewRow
           label="Insurance"
           value={additional?.insuranceProvider || "Not provided"}
