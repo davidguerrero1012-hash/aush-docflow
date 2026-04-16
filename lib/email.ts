@@ -2,7 +2,13 @@ import "server-only";
 
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResendClient() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || key.startsWith("re_your")) {
+    return null;
+  }
+  return new Resend(key);
+}
 
 /**
  * Sends a confirmation email with the generated PDF attached.
@@ -15,6 +21,12 @@ export async function sendConfirmationEmail(
   referenceNumber: string,
   pdfBuffer: Buffer
 ): Promise<void> {
+  const resend = getResendClient();
+  if (!resend) {
+    console.log("[email] Resend API key not configured, skipping email send");
+    return;
+  }
+
   const { error } = await resend.emails.send({
     from: "AUSH DocFlow <onboarding@resend.dev>",
     to,
