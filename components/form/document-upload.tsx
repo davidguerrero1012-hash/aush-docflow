@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { motion, AnimatePresence } from "motion/react";
-import { useDropzone } from "react-dropzone";
-import { Upload, FileText, X, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Camera, RotateCcw } from "lucide-react";
+import { FileUpload as AceternityFileUpload } from "@/components/ui/file-upload";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,7 +28,7 @@ const DOCUMENT_TYPES = [
   { value: "state_id", label: "State ID" },
 ] as const;
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const OCR_FIELD_MAP: Record<string, { label: string; formField: string }> = {
   name: { label: "Full Name", formField: "documentUpload.ocrData.fields.0.value" },
@@ -38,11 +38,7 @@ const OCR_FIELD_MAP: Record<string, { label: string; formField: string }> = {
   expiration: { label: "Expiration Date", formField: "documentUpload.ocrData.fields.4.value" },
 };
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+type CameraState = "inactive" | "requesting" | "active" | "captured" | "denied";
 
 export function DocumentUpload() {
   const {
@@ -52,17 +48,28 @@ export function DocumentUpload() {
   } = useFormContext<IntakeFormData>();
 
   const fileRef = useRef<File | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [, setEditedFields] = useState<Set<string>>(new Set());
-  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const [cameraState, setCameraState] = useState<CameraState>("inactive");
+  const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const docType = useWatch({ control, name: "documentUpload.documentType" });
   const docPath = useWatch({ control, name: "documentUpload.documentPath" });
   const ocrData = useWatch({ control, name: "documentUpload.ocrData" });
 
   const ocr = useOCR();
+
+  // Detect mobile
+  useEffect(() => {
+    setIsMobile(window.matchMedia("(max-width: 640px)").matches);
+  }, []);
 
   function getError(path: string): string | undefined {
     const parts = path.split(".");
@@ -74,11 +81,88 @@ export function DocumentUpload() {
     return current?.message as string | undefined;
   }
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      const file = acceptedFiles[0];
-      if (!file) return;
+  // Camera functions
+  const startCamera = useCallback(async () => {
+    setCameraState("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraState("active");
+    } catch {
+      setCameraState("denied");
+    }
+  }, []);
 
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraState("inactive");
+  }, []);
+
+  const capturePhoto = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+
+    const url = canvas.toDataURL("image/jpeg", 0.9);
+    setCapturedImageUrl(url);
+    setCameraState("captured");
+    stopCamera();
+  }, [stopCamera]);
+
+  const retakePhoto = useCallback(() => {
+    if (capturedImageUrl) {
+      setCapturedImageUrl(null);
+    }
+    startCamera();
+  }, [capturedImageUrl, startCamera]);
+
+  const usePhoto = useCallback(async () => {
+    if (!canvasRef.current) return;
+
+    // Convert canvas to File
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvasRef.current!.toBlob(resolve, "image/jpeg", 0.9)
+    );
+    if (!blob) return;
+
+    const file = new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" });
+    await processFile(file);
+    setCapturedImageUrl(null);
+    setCameraState("inactive");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Clean up camera on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
+
+  // File processing (shared between camera capture and file upload)
+  const processFile = useCallback(
+    async (file: File) => {
       if (file.size > MAX_FILE_SIZE) {
         setUploadError("File too large. Maximum size is 10MB.");
         return;
@@ -87,11 +171,9 @@ export function DocumentUpload() {
       setUploadError(null);
       fileRef.current = file;
 
-      // Create preview
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
 
-      // Upload to API
       setUploading(true);
       try {
         const formData = new FormData();
@@ -114,7 +196,6 @@ export function DocumentUpload() {
           shouldValidate: true,
         });
 
-        // Trigger OCR
         const result = await ocr.processDocument(file, docType || "drivers_license");
         if (result) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,16 +212,6 @@ export function DocumentUpload() {
     [docType, setValue, ocr]
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/jpeg": [".jpg", ".jpeg"],
-      "image/png": [".png"],
-    },
-    maxFiles: 1,
-    disabled: uploading || ocr.status === "loading",
-  });
-
   const removeFile = useCallback(() => {
     fileRef.current = null;
     if (previewUrl) {
@@ -156,7 +227,6 @@ export function DocumentUpload() {
     setUploadError(null);
   }, [previewUrl, setValue, ocr]);
 
-  // Clean up preview URL on unmount
   useEffect(() => {
     return () => {
       if (previewUrl) {
@@ -172,6 +242,7 @@ export function DocumentUpload() {
   const hasFile = !!previewUrl || !!docPath;
   const isProcessing = ocr.status === "loading";
   const hasOcrResults = ocr.status === "success" && ocrData;
+  const showCamera = cameraState === "active" || cameraState === "requesting" || cameraState === "captured";
 
   return (
     <div className="space-y-1">
@@ -182,10 +253,10 @@ export function DocumentUpload() {
         className="mb-6"
       >
         <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
-          Document Upload
+          Document Verification
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Upload a photo of your identification document for verification.
+          Scan or upload your identification document.
         </p>
       </motion.div>
 
@@ -193,7 +264,7 @@ export function DocumentUpload() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0 }}
+        transition={{ duration: 0.3 }}
         className="mb-5"
       >
         <div className="space-y-1.5">
@@ -212,11 +283,10 @@ export function DocumentUpload() {
             <SelectTrigger
               id="documentType"
               className={cn(
-                "h-11 w-full rounded-lg border-zinc-200 text-[15px]",
-                "focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500",
+                "h-11 w-full border-zinc-200 text-[15px]",
+                "focus-visible:ring-2 focus-visible:ring-blue-700/20 focus-visible:border-blue-700",
                 getError("documentUpload.documentType") ? "border-red-500" : ""
               )}
-              aria-invalid={!!getError("documentUpload.documentType")}
             >
               <SelectValue placeholder="Select document type" />
             </SelectTrigger>
@@ -236,146 +306,174 @@ export function DocumentUpload() {
         </div>
       </motion.div>
 
-      {/* Main content: Desktop side-by-side, Mobile stacked */}
+      {/* Main content */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        {/* Left: Upload zone / Preview */}
+        {/* Left: Camera / Upload / Preview */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
         >
           <AnimatePresence mode="wait">
-            {!hasFile ? (
+            {/* Camera View */}
+            {showCamera && !hasFile && (
               <motion.div
-                key="dropzone"
+                key="camera"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div
-                  {...getRootProps()}
-                  className={cn(
-                    "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-all duration-200",
-                    isDragActive
-                      ? "border-indigo-500/50 bg-indigo-50/50"
-                      : "border-zinc-300 bg-zinc-50/50 hover:border-zinc-400 hover:bg-zinc-50",
-                    getError("documentUpload.documentPath") && "border-red-300 bg-red-50/30"
+                <div className="relative border border-zinc-200 bg-black overflow-hidden">
+                  {cameraState === "requesting" && (
+                    <div className="flex items-center justify-center h-64 text-zinc-400 text-sm">
+                      Requesting camera access...
+                    </div>
                   )}
-                >
-                  <input {...getInputProps()} />
-                  <Upload
-                    className={cn(
-                      "mb-3 h-10 w-10",
-                      isDragActive ? "text-indigo-500" : "text-zinc-400"
-                    )}
-                  />
-                  <p className="text-sm font-medium text-zinc-700">
-                    {isDragActive
-                      ? "Drop your document here"
-                      : "Drop your document here or click to browse"}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    JPG, PNG only (max 10MB)
-                  </p>
+
+                  {cameraState === "active" && (
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full"
+                        style={{ maxHeight: "400px", objectFit: "cover" }}
+                      />
+                      {/* Document frame guide */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-[85%] h-[60%] border-2 border-dashed border-white/60" />
+                      </div>
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                        <p className="text-center text-xs text-white/80 mb-3">
+                          Align document within the frame
+                        </p>
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={capturePhoto}
+                            className="h-14 w-14 border-2 border-white bg-white/20 hover:bg-white/40 transition-colors flex items-center justify-center"
+                            aria-label="Capture photo"
+                          >
+                            <div className="h-10 w-10 bg-white" />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {cameraState === "captured" && capturedImageUrl && (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={capturedImageUrl}
+                        alt="Captured document"
+                        className="w-full"
+                        style={{ maxHeight: "400px", objectFit: "contain" }}
+                      />
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                        <div className="flex gap-3 justify-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={retakePhoto}
+                            className="bg-white/90 hover:bg-white text-zinc-900 border-0"
+                          >
+                            <RotateCcw className="mr-1.5 h-4 w-4" />
+                            Retake
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={usePhoto}
+                            className="bg-blue-700 hover:bg-blue-800 text-white border-0"
+                          >
+                            Use Photo
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="mt-2 text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </motion.div>
+            )}
+
+            {/* Camera unavailable — show Aceternity file upload */}
+            {cameraState === "denied" && !hasFile && (
+              <motion.div
+                key="denied"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <AceternityFileUpload
+                  onChange={(files) => {
+                    if (files[0]) processFile(files[0]);
+                  }}
+                />
                 {getError("documentUpload.documentPath") && (
                   <p className="mt-1.5 text-[13px] text-red-500" role="alert">
                     {getError("documentUpload.documentPath")}
                   </p>
                 )}
               </motion.div>
-            ) : (
+            )}
+
+            {/* Default: Scan + Upload options */}
+            {!showCamera && !hasFile && cameraState !== "denied" && (
               <motion.div
-                key="preview"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                key="options"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="space-y-3"
               >
-                {/* Mobile: Collapsible preview */}
-                <div className="sm:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setMobilePreviewOpen(!mobilePreviewOpen)}
-                    className="flex w-full items-center justify-between rounded-lg border border-zinc-200 bg-white p-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-indigo-500" />
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-zinc-900 truncate max-w-[200px]">
-                          {fileRef.current?.name || "Document"}
-                        </p>
-                        <p className="text-xs text-zinc-400">
-                          {fileRef.current ? formatFileSize(fileRef.current.size) : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFile();
-                        }}
-                        className="text-zinc-400 hover:text-red-500"
-                        aria-label="Remove file"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      {mobilePreviewOpen ? (
-                        <ChevronUp className="h-4 w-4 text-zinc-400" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-zinc-400" />
-                      )}
-                    </div>
-                  </button>
-                  <AnimatePresence>
-                    {mobilePreviewOpen && previewUrl && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pt-3">
-                          <DocumentViewer imageUrl={previewUrl} alt="Uploaded document" />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                {/* Camera only — upload shows only after camera fails */}
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  disabled={uploading || ocr.status === "loading"}
+                  className="flex w-full items-center justify-center gap-2 border border-zinc-200 bg-zinc-900 text-white p-4 text-sm font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                >
+                  <Camera className="h-4 w-4" />
+                  Scan Document
+                </button>
+              </motion.div>
+            )}
 
-                {/* Desktop: Full preview */}
-                <div className="hidden sm:block">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-indigo-500" />
-                      <div>
-                        <p className="text-sm font-medium text-zinc-900 truncate max-w-[200px]">
-                          {fileRef.current?.name || "Document"}
-                        </p>
-                        <p className="text-xs text-zinc-400">
-                          {fileRef.current ? formatFileSize(fileRef.current.size) : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={removeFile}
-                      className="text-zinc-400 hover:text-red-500"
-                      aria-label="Remove file"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {previewUrl && (
-                    <DocumentViewer imageUrl={previewUrl} alt="Uploaded document" />
-                  )}
+            {/* File Preview */}
+            {hasFile && (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-2"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-zinc-700 truncate max-w-[240px]">
+                    {fileRef.current?.name || "Scanned document"}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                    className="text-zinc-400 hover:text-red-500 h-8 px-2"
+                    aria-label="Remove file"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
+                {previewUrl && (
+                  <DocumentViewer imageUrl={previewUrl} alt="Uploaded document" />
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -386,13 +484,11 @@ export function DocumentUpload() {
             </p>
           )}
 
-          {/* Tip text */}
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-indigo-50/50 p-3">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
-            <p className="text-xs text-indigo-600">
-              For best results, use a well-lit, flat photo of your document.
+          {!showCamera && (
+            <p className="mt-3 text-xs text-zinc-400">
+              For best results, ensure good lighting and a flat surface.
             </p>
-          </div>
+          )}
         </motion.div>
 
         {/* Right: OCR Processing / Results */}
@@ -427,7 +523,7 @@ export function DocumentUpload() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-center" role="alert">
+                  <div className="border border-amber-200 bg-amber-50 p-5 text-center" role="alert">
                     <p className="text-sm font-medium text-amber-800">
                       {ocr.error || "OCR processing failed."}
                     </p>
@@ -463,7 +559,7 @@ export function DocumentUpload() {
                       </h3>
                       <span className="text-xs text-zinc-500">
                         {(ocrData as OCRResult).fields.filter((f) => f.confidence >= 95).length} of{" "}
-                        {(ocrData as OCRResult).fields.length} high confidence
+                        {(ocrData as OCRResult).fields.length} verified
                       </span>
                     </div>
                     {(ocrData as OCRResult).fields.map((field, index) => {
@@ -483,20 +579,17 @@ export function DocumentUpload() {
                 </motion.div>
               )}
 
-              {!hasFile && !isProcessing && ocr.status === "idle" && (
+              {!hasFile && !isProcessing && ocr.status === "idle" && !showCamera && (
                 <motion.div
                   key="empty"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/30 p-8">
-                    <div className="text-center">
-                      <FileText className="mx-auto mb-2 h-8 w-8 text-zinc-300" />
-                      <p className="text-sm text-zinc-400">
-                        Upload a document to see extracted fields here
-                      </p>
-                    </div>
+                  <div className="flex h-full items-center justify-center border border-dashed border-zinc-200 bg-zinc-50/30 p-8">
+                    <p className="text-sm text-zinc-400 text-center">
+                      Scan or upload a document to extract fields automatically
+                    </p>
                   </div>
                 </motion.div>
               )}
@@ -504,6 +597,10 @@ export function DocumentUpload() {
           </OcrErrorBoundary>
         </motion.div>
       </div>
+
+      {/* Hidden canvas for camera capture */}
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
+

@@ -1,63 +1,64 @@
 import Link from "next/link";
-import { ArrowRight, Shield, FileText, Zap } from "lucide-react";
+import Image from "next/image";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 
 export default function HomePage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-lg text-center">
-        {/* Logo / Brand */}
-        <div className="mb-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500 shadow-lg shadow-indigo-500/25">
-            <FileText className="h-7 w-7 text-white" />
+    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-6">
+      <div className="w-full max-w-xl">
+        <BlurFade delay={0.1} inView>
+          <div className="text-center">
+            <Image
+              src="/aush-logo.png"
+              alt="AUSH Relay"
+              width={64}
+              height={64}
+              className="mx-auto mb-6"
+              priority
+            />
+            <p className="text-xs font-medium uppercase tracking-[0.25em] text-zinc-400">
+              Document Intake Platform
+            </p>
           </div>
-          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-900">
+        </BlurFade>
+
+        <BlurFade delay={0.3} inView>
+          <h1 className="mt-3 text-center text-4xl font-semibold tracking-tight text-zinc-900 sm:text-5xl">
             AUSH DocFlow
           </h1>
-          <p className="mt-2 text-base text-zinc-500">
-            Secure document intake with intelligent verification
-          </p>
-        </div>
+        </BlurFade>
 
-        {/* CTA */}
-        <Link
-          href="/form"
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-indigo-500 px-8 text-base font-medium text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:bg-indigo-600 active:scale-[0.98]"
-        >
-          Start Your Application
-          <ArrowRight className="h-5 w-5" />
-        </Link>
+        <BlurFade delay={0.5} inView>
+          <div className="mx-auto mt-8 h-px w-16 bg-zinc-300" />
+        </BlurFade>
 
-        {/* Features */}
-        <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[
-            {
-              icon: Zap,
-              title: "Smart OCR",
-              desc: "Auto-extract data from your documents",
-            },
-            {
-              icon: Shield,
-              title: "Secure",
-              desc: "AES-256 encryption for sensitive data",
-            },
-            {
-              icon: FileText,
-              title: "PDF Summary",
-              desc: "Get a complete summary of your submission",
-            },
-          ].map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
+        <BlurFade delay={0.6} inView>
+          <div className="mt-8">
+            <TextGenerateEffect
+              words="Secure document intake with intelligent verification, automated OCR extraction, and encrypted storage."
+              className="text-center text-base font-normal leading-relaxed text-zinc-500"
+              duration={0.3}
+            />
+          </div>
+        </BlurFade>
+
+        <BlurFade delay={0.9} inView>
+          <div className="mt-10 text-center">
+            <Link
+              href="/form"
+              className="inline-flex h-12 items-center justify-center border border-zinc-900 bg-zinc-900 px-10 text-sm font-medium tracking-wide text-white transition-colors duration-150 hover:bg-zinc-800"
             >
-              <feature.icon className="mx-auto mb-2 h-6 w-6 text-indigo-500" />
-              <h3 className="text-sm font-semibold text-zinc-900">
-                {feature.title}
-              </h3>
-              <p className="mt-1 text-xs text-zinc-500">{feature.desc}</p>
-            </div>
-          ))}
-        </div>
+              Start Application
+            </Link>
+          </div>
+        </BlurFade>
+
+        <BlurFade delay={1.1} inView>
+          <p className="mt-14 text-center text-xs tracking-wide text-zinc-400">
+            Smart OCR&ensp;/&ensp;AES-256 Encryption&ensp;/&ensp;PDF Summary&ensp;/&ensp;Real-time Validation
+          </p>
+        </BlurFade>
       </div>
     </div>
   );

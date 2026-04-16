@@ -1,130 +1,83 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Send } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 
 interface StepNavigationProps {
   currentStep: number;
+  totalSteps: number;
   onNext: () => void;
   onBack: () => void;
   onSubmit: () => void;
+  onSkip?: () => void;
   isSubmitting: boolean;
+  isOptional?: boolean;
 }
 
 export function StepNavigation({
   currentStep,
+  totalSteps,
   onNext,
   onBack,
   onSubmit,
+  onSkip,
   isSubmitting,
+  isOptional,
 }: StepNavigationProps) {
   const isFirst = currentStep === 0;
-  const isLast = currentStep === 5;
+  const isReview = currentStep === totalSteps - 1;
+  const isBeforeReview = currentStep === totalSteps - 2;
 
   return (
-    <>
-      {/* Mobile: Fixed bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/80 p-4 backdrop-blur-xl sm:hidden">
-        <div className="flex items-center justify-between gap-3">
-          {!isFirst && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onBack}
-              disabled={isSubmitting}
-              className="h-11 flex-1 text-zinc-600 active:scale-[0.98] transition-transform duration-200"
-            >
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Back
-            </Button>
-          )}
-          {isLast ? (
-            <Button
-              type="button"
-              onClick={onSubmit}
-              disabled={isSubmitting}
-              className={cn(
-                "h-11 flex-1 bg-indigo-500 text-white hover:bg-indigo-600 active:scale-[0.98] transition-all duration-200",
-                "shadow-lg shadow-indigo-500/25"
-              )}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-1.5 h-4 w-4" />
-                  Submit Application
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={onNext}
-              disabled={isSubmitting}
-              className="h-11 flex-1 bg-indigo-500 text-white hover:bg-indigo-600 active:scale-[0.98] transition-all duration-200"
-            >
-              Next
-              <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Desktop: Relative position */}
-      <div className="mt-8 hidden items-center justify-between sm:flex">
-        {!isFirst ? (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onBack}
-            disabled={isSubmitting}
-            className="h-11 px-6 text-zinc-600 active:scale-[0.98] transition-transform duration-200"
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back
-          </Button>
-        ) : (
-          <div />
-        )}
-        {isLast ? (
-          <Button
+    <div className="mt-8 space-y-4">
+      <div className="flex items-center gap-4">
+        {isReview ? (
+          <button
             type="button"
             onClick={onSubmit}
             disabled={isSubmitting}
-            className={cn(
-              "h-11 px-8 bg-indigo-500 text-white hover:bg-indigo-600 active:scale-[0.98] transition-all duration-200",
-              "shadow-lg shadow-indigo-500/25"
-            )}
+            className="h-12 w-full bg-zinc-900 text-base font-medium text-white hover:bg-zinc-800 transition-colors disabled:opacity-50"
           >
             {isSubmitting ? (
-              <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Submitting...
-              </>
+              </span>
             ) : (
-              <>
-                <Send className="mr-1.5 h-4 w-4" />
-                Submit Application
-              </>
+              "Submit"
             )}
-          </Button>
+          </button>
         ) : (
-          <Button
-            type="button"
-            onClick={onNext}
-            disabled={isSubmitting}
-            className="h-11 px-8 bg-indigo-500 text-white hover:bg-indigo-600 active:scale-[0.98] transition-all duration-200"
-          >
-            Next
-            <ArrowRight className="ml-1.5 h-4 w-4" />
-          </Button>
+          <>
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={isSubmitting}
+              className="h-12 bg-zinc-900 px-8 text-base font-medium text-white hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            >
+              {isBeforeReview ? "Continue to review" : "OK"}
+            </button>
+            <span className="text-sm text-zinc-400">
+              press Enter {"<-'"}
+            </span>
+          </>
         )}
       </div>
-    </>
+
+      {isOptional && onSkip && !isReview && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="text-sm text-zinc-400 underline underline-offset-2 hover:text-zinc-600 transition-colors"
+        >
+          Skip
+        </button>
+      )}
+
+      {!isFirst && !isReview && (
+        <p className="text-xs text-zinc-400">
+          Shift + Enter to go back
+        </p>
+      )}
+    </div>
   );
 }

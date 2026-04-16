@@ -3,13 +3,6 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -17,16 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Download,
-  Loader2,
-} from "lucide-react";
 import type { Submission, OCRField } from "@/types";
 
 interface SubmissionDetailProps {
@@ -35,39 +18,13 @@ interface SubmissionDetailProps {
   pdfUrl: string | null;
 }
 
-
-function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const level =
-    confidence >= 80 ? "high" : confidence >= 50 ? "medium" : "low";
-  const config = {
-    high: {
-      label: `${confidence}% High`,
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    },
-    medium: {
-      label: `${confidence}% Medium`,
-      className: "bg-amber-50 text-amber-700 border-amber-200",
-    },
-    low: {
-      label: `${confidence}% Low`,
-      className: "bg-red-50 text-red-700 border-red-200",
-    },
-  };
-  const c = config[level];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
-        c.className
-      )}
-      aria-label={`Confidence: ${c.label}`}
-    >
-      {c.label}
-    </span>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-4">
       <dt className="min-w-[140px] text-sm text-zinc-500">{label}</dt>
@@ -78,7 +35,7 @@ function InfoRow({ label, value }: { label: string; value: string | number | nul
   );
 }
 
-function SectionCard({
+function SectionBox({
   title,
   children,
 }: {
@@ -86,16 +43,27 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="border-b border-zinc-100 pb-3">
-        <CardTitle className="text-base font-semibold tracking-tight text-zinc-900">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-4">
-        <dl className="space-y-3">{children}</dl>
-      </CardContent>
-    </Card>
+    <div className="border border-zinc-200 bg-white p-6">
+      <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-zinc-500">
+        {title}
+      </h3>
+      <dl className="space-y-3">{children}</dl>
+    </div>
+  );
+}
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  const level =
+    confidence >= 80 ? "high" : confidence >= 50 ? "medium" : "low";
+  const colors = {
+    high: "text-emerald-700",
+    medium: "text-amber-700",
+    low: "text-red-700",
+  };
+  return (
+    <span className={`text-xs font-medium ${colors[level]}`}>
+      {confidence}%
+    </span>
   );
 }
 
@@ -187,76 +155,90 @@ export function SubmissionDetail({
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
+  const STATUS_DOT: Record<Submission["status"], string> = {
+    new: "bg-blue-500",
+    reviewed: "bg-emerald-500",
+    flagged: "bg-red-500",
+  };
+
+  const STATUS_LABEL: Record<Submission["status"], string> = {
+    new: "New",
+    reviewed: "Reviewed",
+    flagged: "Flagged",
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Back link */}
+      <button
+        onClick={() => router.push("/admin/dashboard")}
+        className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+      >
+        <span aria-hidden="true">&larr;</span>
+        Back to submissions
+      </button>
+
+      {/* Title row */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push("/admin/dashboard")}
-            aria-label="Back to submissions"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-              {submission.firstName} {submission.lastName}
-            </h1>
-            <p className="text-sm text-zinc-500">
-              {submission.referenceNumber} &middot;{" "}
-              {new Date(submission.createdAt).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+            {submission.referenceNumber}
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            {submission.firstName} {submission.lastName}
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm text-zinc-500">Status</Label>
-            <Select value={status} onValueChange={(val) => val && handleStatusChange(val)}>
-              <SelectTrigger
-                className={cn(
-                  "h-9 w-32",
-                  statusSaving && "opacity-70"
-                )}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="new">
-                  <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-500" />
-                    New
-                  </span>
-                </SelectItem>
-                <SelectItem value="reviewed">
-                  <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Reviewed
-                  </span>
-                </SelectItem>
-                <SelectItem value="flagged">
-                  <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-red-500" />
-                    Flagged
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {pdfUrl && (
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm">
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                PDF
-              </Button>
+          <span className="flex items-center gap-2 text-sm text-zinc-600">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT[status]}`}
+            />
+            {STATUS_LABEL[status]}
+          </span>
+          <span className="text-sm text-zinc-400">
+            {new Date(submission.createdAt).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+          {pdfUrl ? (
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center border border-zinc-200 bg-white px-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+            >
+              Download PDF
             </a>
+          ) : (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await fetch("/api/generate-pdf", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-internal-secret": "admin-trigger",
+                    },
+                    body: JSON.stringify({ submissionId: submission.id }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data.pdfUrl) {
+                      window.open(data.pdfUrl, "_blank");
+                    }
+                  }
+                } catch {
+                  // ignore
+                }
+              }}
+              className="inline-flex h-9 items-center border border-zinc-200 bg-white px-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+            >
+              Generate PDF
+            </button>
           )}
         </div>
       </div>
@@ -264,8 +246,8 @@ export function SubmissionDetail({
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left Column */}
         <div className="space-y-6">
-          {/* Personal Info */}
-          <SectionCard title="Personal Information">
+          {/* Personal Information */}
+          <SectionBox title="Personal Information">
             <InfoRow label="First Name" value={submission.firstName} />
             <InfoRow label="Last Name" value={submission.lastName} />
             <InfoRow label="Date of Birth" value={submission.dateOfBirth} />
@@ -277,31 +259,25 @@ export function SubmissionDetail({
               </dt>
               <dd className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zinc-900">
-                  {showSsn && ssnValue
-                    ? `***-**-${ssnValue}`
-                    : "***-**-****"}
+                  {showSsn && ssnValue ? `***-**-${ssnValue}` : "----"}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
+                <button
                   onClick={handleShowSsn}
                   disabled={ssnLoading}
-                  aria-label={showSsn ? "Hide SSN" : "Show SSN"}
+                  className="text-sm text-blue-800 hover:text-blue-800 disabled:opacity-50 transition-colors"
                 >
-                  {ssnLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : showSsn ? (
-                    <EyeOff className="h-3.5 w-3.5" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                  )}
-                </Button>
+                  {ssnLoading
+                    ? "Loading..."
+                    : showSsn
+                      ? "Hide"
+                      : "Reveal"}
+                </button>
               </dd>
             </div>
-          </SectionCard>
+          </SectionBox>
 
-          {/* Address Info */}
-          <SectionCard title="Address Information">
+          {/* Address */}
+          <SectionBox title="Address">
             <InfoRow label="Street" value={submission.streetAddress} />
             <InfoRow label="City" value={submission.city} />
             <InfoRow label="State" value={submission.state} />
@@ -331,10 +307,10 @@ export function SubmissionDetail({
                   />
                 </>
               )}
-          </SectionCard>
+          </SectionBox>
 
-          {/* Employment Info */}
-          <SectionCard title="Employment Information">
+          {/* Employment */}
+          <SectionBox title="Employment">
             <InfoRow label="Employer" value={submission.employerName} />
             <InfoRow label="Occupation" value={submission.occupation} />
             <InfoRow
@@ -345,20 +321,20 @@ export function SubmissionDetail({
               label="Status"
               value={formatDocType(submission.employmentStatus)}
             />
-          </SectionCard>
+          </SectionBox>
         </div>
 
         {/* Right Column */}
         <div className="space-y-6">
-          {/* Document Info */}
-          <SectionCard title="Document Information">
+          {/* Document */}
+          <SectionBox title="Document">
             <InfoRow
               label="Document Type"
               value={formatDocType(submission.documentType)}
             />
             {documentUrl && (
               <div className="pt-2">
-                <div className="overflow-hidden rounded-lg border border-zinc-200">
+                <div className="overflow-hidden border border-zinc-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={documentUrl}
@@ -368,20 +344,17 @@ export function SubmissionDetail({
                 </div>
               </div>
             )}
-          </SectionCard>
-
-          {/* OCR Data */}
-          {submission.ocrData && submission.ocrData.fields.length > 0 && (
-            <SectionCard title="OCR Results">
-              <p className="text-xs text-zinc-500">
-                Processed in {submission.ocrData.processingTimeMs}ms
-              </p>
-              <div className="space-y-2 pt-1">
+            {submission.ocrData && submission.ocrData.fields.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-zinc-400">
+                  OCR Results (processed in {submission.ocrData.processingTimeMs}
+                  ms)
+                </p>
                 {submission.ocrData.fields.map(
                   (field: OCRField, idx: number) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50/50 px-3 py-2"
+                      className="flex items-center justify-between border-b border-zinc-100 py-2"
                     >
                       <div>
                         <p className="text-xs text-zinc-500">
@@ -396,50 +369,72 @@ export function SubmissionDetail({
                   )
                 )}
               </div>
-            </SectionCard>
-          )}
+            )}
+          </SectionBox>
 
-          {/* Additional Info */}
-          <SectionCard title="Additional Information">
-            <InfoRow
-              label="Insurance"
-              value={submission.insuranceProvider}
-            />
-            <InfoRow
-              label="Policy #"
-              value={submission.policyNumber}
-            />
-            <InfoRow
-              label="Dependents"
-              value={submission.dependentsCount}
-            />
-            <InfoRow
-              label="Notes"
-              value={submission.additionalNotes}
-            />
-          </SectionCard>
+          {/* Additional */}
+          <SectionBox title="Additional">
+            <InfoRow label="Insurance" value={submission.insuranceProvider} />
+            <InfoRow label="Policy #" value={submission.policyNumber} />
+            <InfoRow label="Dependents" value={submission.dependentsCount} />
+            <InfoRow label="Notes" value={submission.additionalNotes} />
+          </SectionBox>
 
-          {/* Admin Notes */}
-          <Card className="shadow-sm">
-            <CardHeader className="border-b border-zinc-100 pb-3">
-              <CardTitle className="text-base font-semibold tracking-tight text-zinc-900">
-                Admin Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <Textarea
-                placeholder="Add internal notes about this submission..."
-                value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
-                onBlur={handleNotesBlur}
-                className="min-h-24 resize-y"
-                rows={4}
-              />
-              <p className="mt-1.5 text-xs text-zinc-400">
-                Auto-saves when you click away
-              </p>
-            </CardContent>
-          </Card>
+          {/* Admin */}
+          <div className="border border-zinc-200 bg-white p-6">
+            <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Admin
+            </h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm text-zinc-500">Status</label>
+                <Select
+                  value={status}
+                  onValueChange={(val) => val && handleStatusChange(val)}
+                >
+                  <SelectTrigger
+                    className={`h-9 w-full ${statusSaving ? "opacity-70" : ""}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-blue-500" />
+                        New
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="reviewed">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        Reviewed
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="flagged">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        Flagged
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-zinc-500">Admin Notes</label>
+                <textarea
+                  placeholder="Add internal notes about this submission..."
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  onBlur={handleNotesBlur}
+                  className="min-h-24 w-full resize-y border border-zinc-200 bg-white p-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-zinc-400 transition-colors"
+                  rows={4}
+                />
+                <p className="text-xs text-zinc-400">
+                  Auto-saves when you click away
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

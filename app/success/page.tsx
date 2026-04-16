@@ -3,8 +3,7 @@
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Download, ArrowRight, CheckCircle2, Clock, Mail, FileText } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BlurFade } from "@/components/ui/blur-fade";
 import Link from "next/link";
 
 type PDFStatus = "checking" | "ready" | "unavailable";
@@ -16,32 +15,10 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const refNumber = searchParams.get("ref");
 
-  const [isValid, setIsValid] = useState<boolean | null>(refNumber ? null : false);
+  const [isValid] = useState<boolean | null>(refNumber ? true : false);
   const [pdfStatus, setPdfStatus] = useState<PDFStatus>("checking");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
-  // Validate reference number
-  useEffect(() => {
-    if (!refNumber) return;
-
-    async function validate() {
-      try {
-        const res = await fetch(`/api/submit?ref=${encodeURIComponent(refNumber!)}`);
-        if (res.ok) {
-          setIsValid(true);
-        } else {
-          setIsValid(false);
-        }
-      } catch {
-        // If validation fails (e.g., API not ready), still show the page
-        setIsValid(true);
-      }
-    }
-
-    validate();
-  }, [refNumber]);
-
-  // Poll for PDF readiness
   useEffect(() => {
     if (!refNumber || !isValid) return;
 
@@ -91,30 +68,27 @@ function SuccessContent() {
 
   if (isValid === null) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="animate-pulse text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-zinc-200" />
-          <div className="mt-4 h-6 w-48 rounded bg-zinc-200 mx-auto" />
-        </div>
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-zinc-400">Loading...</p>
       </div>
     );
   }
 
   if (!isValid) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center px-4">
+      <div className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center max-w-md">
           <h1 className="text-xl font-semibold text-zinc-900">
             Invalid Reference
           </h1>
           <p className="mt-2 text-sm text-zinc-500">
-            The reference number provided is not valid. Please check your
-            confirmation email for the correct reference.
+            The reference number provided is not valid.
           </p>
-          <Link href="/form">
-            <Button className="mt-6 h-11 bg-indigo-500 text-white hover:bg-indigo-600">
-              Start New Application
-            </Button>
+          <Link
+            href="/form"
+            className="mt-6 inline-flex h-11 items-center justify-center bg-zinc-900 px-6 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+          >
+            Start New Application
           </Link>
         </div>
       </div>
@@ -122,167 +96,106 @@ function SuccessContent() {
   }
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md text-center">
-        {/* Animated checkmark */}
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
-          className="mx-auto mb-6"
-        >
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
-            <motion.svg
-              viewBox="0 0 52 52"
-              className="h-10 w-10"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <motion.circle
-                cx="26"
-                cy="26"
-                r="24"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-              />
-              <motion.path
-                d="M15 27l7 7 15-15"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
-              />
-            </motion.svg>
-          </div>
-        </motion.div>
+    <div className="flex min-h-screen flex-col items-center justify-center px-6">
+      <div className="w-full max-w-lg text-center">
 
-        {/* Heading */}
+        {/* Confirmation line — no emoji, just a horizontal rule that draws in */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Your Submission Has Been Received
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mx-auto mb-8 h-px w-24 bg-blue-700 origin-center"
+        />
+
+        <BlurFade delay={0.2} inView>
+          <p className="text-xs font-medium uppercase tracking-[0.25em] text-zinc-400 mb-3">
+            Submission Confirmed
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
+            We received your application
           </h1>
-        </motion.div>
+        </BlurFade>
 
         {/* Reference number */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6"
-        >
-          <p className="text-sm text-zinc-500 mb-2">Reference Number</p>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-3">
-            <span className="font-mono text-lg font-semibold text-zinc-900 tracking-wider">
+        <BlurFade delay={0.4} inView>
+          <div className="mt-8">
+            <p className="text-xs text-zinc-400 mb-2 uppercase tracking-wider">Reference</p>
+            <p className="font-mono text-xl font-semibold text-zinc-900 tracking-wider">
               {refNumber}
-            </span>
+            </p>
           </div>
-        </motion.div>
+        </BlurFade>
 
-        {/* Email confirmation */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="mt-4 flex items-center justify-center gap-2 text-sm text-zinc-500"
-        >
-          <Mail className="h-4 w-4" />
-          <span>
-            A confirmation email with your PDF summary has been sent to your
-            email.
-          </span>
-        </motion.div>
+        {/* Divider */}
+        <BlurFade delay={0.5} inView>
+          <div className="mx-auto mt-8 h-px w-16 bg-zinc-200" />
+        </BlurFade>
+
+        {/* Email note */}
+        <BlurFade delay={0.6} inView>
+          <p className="mt-8 text-sm text-zinc-500">
+            A confirmation email with your PDF summary has been sent.
+          </p>
+        </BlurFade>
 
         {/* PDF Download */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="mt-6"
-        >
-          {pdfStatus === "checking" && (
-            <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
-              <Clock className="h-4 w-4 animate-pulse" />
-              <span>Generating your PDF summary...</span>
-            </div>
-          )}
-          {pdfStatus === "ready" && (
-            <Button
-              onClick={handleDownload}
-              className="h-11 bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/25"
-            >
-              <Download className="mr-1.5 h-4 w-4" />
-              Download PDF Summary
-            </Button>
-          )}
-          {pdfStatus === "unavailable" && (
-            <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
-              <FileText className="h-4 w-4" />
-              <span>PDF will be emailed to you shortly.</span>
-            </div>
-          )}
-        </motion.div>
+        <BlurFade delay={0.7} inView>
+          <div className="mt-6">
+            {pdfStatus === "checking" && (
+              <p className="text-sm text-zinc-400">
+                Generating PDF...
+              </p>
+            )}
+            {pdfStatus === "ready" && (
+              <button
+                onClick={handleDownload}
+                className="inline-flex h-11 items-center justify-center border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-900 hover:bg-zinc-50 transition-colors"
+              >
+                Download PDF
+              </button>
+            )}
+            {pdfStatus === "unavailable" && (
+              <p className="text-sm text-zinc-400">
+                PDF will be emailed to you shortly.
+              </p>
+            )}
+          </div>
+        </BlurFade>
 
         {/* What happens next */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 text-left shadow-sm"
-        >
-          <h3 className="text-sm font-semibold text-zinc-900 mb-4">
-            What Happens Next
-          </h3>
-          <ul className="space-y-3">
-            {[
-              {
-                icon: CheckCircle2,
-                text: "Your application is now being reviewed by our team.",
-              },
-              {
-                icon: Clock,
-                text: "Processing typically takes 1-2 business days.",
-              },
-              {
-                icon: Mail,
-                text: "You'll receive an email update when your application status changes.",
-              },
-            ].map((item, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
-                <span className="text-sm text-zinc-600">{item.text}</span>
-              </li>
-            ))}
-          </ul>
-        </motion.div>
+        <BlurFade delay={0.9} inView>
+          <div className="mt-12 border border-zinc-200 bg-white p-6 text-left">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-400 mb-4">
+              What happens next
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-blue-700" />
+                <p className="text-sm text-zinc-600">Your application is now being reviewed by our team.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-blue-700" />
+                <p className="text-sm text-zinc-600">Processing typically takes 1-2 business days.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-blue-700" />
+                <p className="text-sm text-zinc-600">You will receive an email when your status changes.</p>
+              </div>
+            </div>
+          </div>
+        </BlurFade>
 
-        {/* Back to home */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="mt-6"
-        >
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 text-sm text-indigo-500 hover:text-indigo-600 transition-colors"
-          >
-            Back to Home
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </motion.div>
+        {/* Back */}
+        <BlurFade delay={1.1} inView>
+          <div className="mt-8">
+            <Link
+              href="/"
+              className="text-sm text-zinc-400 hover:text-zinc-600 transition-colors"
+            >
+              Back to home
+            </Link>
+          </div>
+        </BlurFade>
       </div>
     </div>
   );
@@ -292,11 +205,8 @@ export default function SuccessPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <div className="animate-pulse text-center">
-            <div className="mx-auto h-16 w-16 rounded-full bg-zinc-200" />
-            <div className="mt-4 h-6 w-48 rounded bg-zinc-200 mx-auto" />
-          </div>
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-sm text-zinc-400">Loading...</p>
         </div>
       }
     >

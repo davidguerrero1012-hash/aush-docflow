@@ -26,7 +26,7 @@ export async function generateSubmissionPDF(
   let yPos = margin;
 
   // -- Header --
-  doc.setFillColor(99, 102, 241); // indigo-500
+  doc.setFillColor(30, 64, 175); // blue-700
   doc.rect(0, 0, pageWidth, 35, "F");
 
   doc.setTextColor(255, 255, 255);
@@ -61,7 +61,7 @@ export async function generateSubmissionPDF(
   function addSection(title: string, rows: [string, string][]) {
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(99, 102, 241);
+    doc.setTextColor(30, 64, 175);
     doc.text(title, margin, yPos);
     yPos += 2;
 

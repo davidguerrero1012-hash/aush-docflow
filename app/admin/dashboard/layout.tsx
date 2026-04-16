@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
-import { AdminNav } from "@/components/admin/admin-nav";
-import { MobileNav } from "@/components/admin/mobile-nav";
+import Image from "next/image";
+import { AdminLogoutButton } from "@/components/admin/admin-logout-button";
 
 export const metadata = {
   title: "Admin Dashboard | AUSH DocFlow",
@@ -24,6 +24,15 @@ export default async function AdminDashboardLayout({
         getAll() {
           return cookieStore.getAll();
         },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // setAll called from Server Component — safe to ignore
+          }
+        },
       },
     }
   );
@@ -36,8 +45,14 @@ export default async function AdminDashboardLayout({
     redirect("/admin/login");
   }
 
-  // Verify user is in admin_users table
-  const { data: adminUser } = await supabase
+  // Use service role to check admin_users (bypasses RLS)
+  const { createClient } = await import("@supabase/supabase-js");
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: adminUser } = await adminClient
     .from("admin_users")
     .select("id")
     .eq("id", user.id)
@@ -49,21 +64,17 @@ export default async function AdminDashboardLayout({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-zinc-200 bg-white lg:block">
-        <AdminNav />
-      </aside>
-
-      {/* Mobile header */}
-      <header className="sticky top-0 z-20 flex h-14 items-center border-b border-zinc-200 bg-white px-4 lg:hidden">
-        <MobileNav />
-        <span className="ml-3 text-sm font-semibold tracking-tight text-zinc-900">
-          AUSH DocFlow
-        </span>
+      <header className="fixed top-0 left-0 right-0 z-30 flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-6">
+        <div className="flex items-center gap-2.5">
+          <Image src="/aush-logo.png" alt="AUSH" width={28} height={28} />
+          <span className="text-sm font-semibold tracking-tight text-zinc-900">
+            DocFlow <span className="font-normal text-zinc-400">Admin</span>
+          </span>
+        </div>
+        <AdminLogoutButton />
       </header>
 
-      {/* Main content */}
-      <main className="lg:ml-64">
+      <main className="pt-14">
         <div className="mx-auto max-w-6xl p-6 lg:p-8">{children}</div>
       </main>
     </div>

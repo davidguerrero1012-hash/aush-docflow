@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { mapSubmissionFromDB } from "@/lib/mappers";
 import { SubmissionDetail } from "@/components/admin/submission-detail";
 import type { SubmissionRow } from "@/types";
@@ -11,18 +10,12 @@ interface PageProps {
 
 export default async function SubmissionDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const cookieStore = await cookies();
 
-  const supabase = createServerClient(
+  // Layout already verified user is authenticated admin
+  // Use service role to fetch data (bypasses RLS)
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-      },
-    }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   // Fetch submission
