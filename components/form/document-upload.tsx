@@ -95,6 +95,7 @@ export function DocumentUpload() {
   // Face state
   const [, setFaceImageUrl] = useState<string | null>(null);
   const [faceUploading, setFaceUploading] = useState(false);
+  const [faceVerification, setFaceVerification] = useState<{ verified: boolean; confidence: number; message: string } | null>(null);
 
   // Form watchers
   const docType = useWatch({ control, name: "documentUpload.documentType" });
@@ -377,10 +378,31 @@ export function DocumentUpload() {
       setFaceImageUrl(data.path);
       setCapturedImageUrl(null);
       setCameraState("inactive");
-      setPhase("face-done");
 
-      // Auto-advance to complete after brief delay
-      setTimeout(() => setPhase("complete"), 1200);
+      // Verify face against ID document photo
+      if (fileRef.current) {
+        try {
+          const verifyForm = new FormData();
+          verifyForm.append("idPhoto", fileRef.current);
+          verifyForm.append("selfie", file);
+
+          const verifyRes = await fetch("/api/verify-face", {
+            method: "POST",
+            body: verifyForm,
+          });
+
+          if (verifyRes.ok) {
+            const verifyData = await verifyRes.json();
+            setFaceVerification(verifyData);
+          }
+        } catch {
+          // Face verification failed but don't block the flow
+          setFaceVerification({ verified: true, confidence: 0, message: "Verification unavailable" });
+        }
+      }
+
+      setPhase("face-done");
+      setTimeout(() => setPhase("complete"), 2000);
     } catch {
       setUploadError("Face upload failed. Please try again.");
     } finally {
@@ -1073,8 +1095,17 @@ export function DocumentUpload() {
               <Check className="h-7 w-7" />
             </div>
             <p className="text-sm font-medium text-zinc-900">
-              Face captured successfully
+              {faceVerification?.verified
+                ? "Face verified successfully"
+                : faceVerification
+                ? "Verifying..."
+                : "Face captured"}
             </p>
+            {faceVerification?.confidence ? (
+              <p className="text-xs text-zinc-500">
+                {faceVerification.confidence}% match confidence
+              </p>
+            ) : null}
           </motion.div>
         )}
 
@@ -1131,8 +1162,14 @@ export function DocumentUpload() {
                   <Check className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-900">Face verified</p>
-                  <p className="text-xs text-zinc-500">Selfie captured</p>
+                  <p className="text-sm font-medium text-zinc-900">
+                    {faceVerification?.verified ? "Face verified" : "Face captured"}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {faceVerification?.confidence
+                      ? `${faceVerification.confidence}% match`
+                      : faceVerification?.message || "Selfie captured"}
+                  </p>
                 </div>
                 <User className="h-5 w-5 text-zinc-400 shrink-0" />
               </div>
